@@ -50,9 +50,6 @@ CREATE TABLE `items` (
 -- Dumping data for table `items`
 --
 
-INSERT INTO `items` (`id`, `category`, `icon`, `name`, `grade`, `level`, `classes`, `races`, `gender`, `obtainable`, `tradable`, `dyeable`, `period`, `periodByWebAdmin`, `name_de`, `name_en`) VALUES
-(1, 'fabrication', 'icon_items/artisan_potion_tex', 'service_item_01', 1, 1, '', '', '', 1, 0, 0, 0, 0, 'Velika Mitternachts Öl', 'Velika Midnight Oil');
-
 --
 -- Indexes for dumped tables
 --
