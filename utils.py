@@ -1,5 +1,6 @@
 import configparser
 import datetime
+import json
 import urllib.error
 import xml.etree.ElementTree as xml
 from os.path import exists, isdir
@@ -49,7 +50,7 @@ def readConfig(ini: str) -> dict:
 
 
 # noinspection PyArgumentList
-def loadXML(path: str, comments=False, useBackup=False, debug=False):
+def loadXML(path: str, comments=False, useBackup=False, debug: bool=False):
     if not exists(path): raise Exception(f'Path {path} doesn\'t exist!')
     if useBackup: backup(path, debug)
     parser = xml.XMLParser(target=xml.TreeBuilder(insert_comments=comments))
@@ -59,31 +60,44 @@ def loadXML(path: str, comments=False, useBackup=False, debug=False):
     return tree, root
 
 
-def saveXML(path: str, tree: xml.ElementTree, debug=False):
+def saveXML(path: str, tree: xml.ElementTree, debug: bool=False):
     xml.indent(tree, space='\t')
     tree.write(path, encoding='utf-8-sig',xml_declaration=True)
     string = xml.tostring(tree.getroot(),'unicode').replace('\n','\r\n')
     string = f"<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n{string}"
-    if debug: print(f'Saved {path}')
     with codecs.open(path,'w','utf-8-sig') as file:
         file.write(string)
+    if debug: print(f'Saved {path}')
 
 
-def saveTxt(path: str, string: str):
+def saveTxt(path: str, string: str, debug: bool=False) -> bool:
     with open(path,'w') as file:
         file.write(string)
+    if debug: print(f'Saved {path}')
     return True
 
 
-def backup(path, debug=False):
-    pybak = path+'.bak'
-    if not exists(pybak):
-        copyfile(path,pybak)
-        if debug: print(f'Created {pybak}')
-    return pybak
+def saveJson(path: str, dict: dict, sort: bool=False, debug: bool=False) -> bool:
+    with open(path,'w') as file:
+        if sort:
+            json.dump(dict, file, sort_keys=True, indent=4)
+        else:
+            json.dump(dict, file, indent=4)
+    if debug: print(f'Saved {path}')
+    return True
 
 
-def getAllXML(path: str):
+def backup(path, debug: bool=False) -> str:
+    bak = path+'.bak'
+    if not exists(bak):
+        copyfile(path, bak)
+        if debug: print(f'Created {bak}')
+    else:
+        print(f"{bak} already exists!")
+    return bak
+
+
+def getAllXML(path: str) -> list:
     files = []
     for file in listdir(f"./data/{path}"):
         if file.endswith(".xml"):
@@ -91,15 +105,23 @@ def getAllXML(path: str):
     return files
 
 
-def sortIterable(list: set) -> list:
-    print(f"Sorting Entities...")
+def sortIterable(list: set, debug: bool=False) -> list:
+    if debug: print(f"Sorting Entities...")
     listSorted = sorted(list)
     listNo = len(listSorted)
-    print(f"Sorting Entities complete: {listNo}")
+    if debug: print(f"Sorting Entities complete: {listNo}")
     return listSorted
 
 
-def getAttributes(typ: str, debug=False) -> set:
+def sortDictionary(dict: dict, debug: bool=False) -> dict:
+    if debug: print(f"Sorting Entities...")
+    dictSorted = {k: dict[k] for k in sorted(dict)}
+    dictNo = len(dictSorted)
+    if debug: print(f"Sorting Entities complete: {dictNo}")
+    return dictSorted
+
+
+def getAttributes(typ: str, debug: bool=False) -> set:
     print(f"Getting Attributes...")
     files = getAllXML(typ)
     attributes = set()
@@ -113,7 +135,7 @@ def getAttributes(typ: str, debug=False) -> set:
     return attributes
 
 
-def itemsRead(items: dict, debug=False):
+def itemsRead(items: dict, debug: bool=False) -> dict:
     print(f"Reading Items...")
     dir = "Item"
     files = getAllXML(dir)
@@ -134,17 +156,17 @@ def itemsRead(items: dict, debug=False):
             items[itemId]['classes'] = item.get('requiredClass') if item.get('requiredClass') else ''
             items[itemId]['races'] = item.get('requiredRace') if item.get('requiredRace') else ''
             items[itemId]['gender'] = item.get('requiredGender') if item.get('requiredGender') else ''
-            items[itemId]['tradable'] = '1' if item.get('tradable') == "True" else '0'
-            items[itemId]['obtainable'] = '1' if item.get('obtainable') == "True" else '0'
-            items[itemId]['dyeable'] = '1' if item.get('changeColorEnable') == "True" else '0'
+            items[itemId]['tradable'] = '1' if item.get('tradable') == "True" or item.get('tradable') == "true" else '0'
+            items[itemId]['obtainable'] = '1' if item.get('obtainable') == "True" or item.get('obtainable') == "true" else '0'
+            items[itemId]['dyeable'] = '1' if item.get('changeColorEnable') == "True" or item.get('changeColorEnable') == "true" else '0'
             items[itemId]['period'] = item.get('periodInMinute') if item.get('periodInMinute') else '0'
-            items[itemId]['periodAdmin'] = '1' if item.get('periodByWebAdmin') == "True" else '0'
+            items[itemId]['periodAdmin'] = '1' if item.get('periodByWebAdmin') == "True" or item.get('periodByWebAdmin') == "true" else '0'
 
     print(f"Reading Items complete: {itemNo}")
-    return items
+    return sortDictionary(items, debug)
 
 
-def itemsAddName(items: dict, debug=False) -> dict:
+def itemsAddName(items: dict, debug: bool=False) -> dict:
     print(f"Adding Item Names...")
     dir = "StrSheet_Item"
     files = getAllXML(dir)
@@ -219,7 +241,7 @@ def itemsInsertDb(items: dict, link, conn) -> bool:
     return save
 
 
-def abnormsRead(abnorms: dict, debug=False):
+def abnormsRead(abnorms: dict, debug: bool=False) -> dict:
     print(f"Reading Abnormalities...")
     dir = "Abnormality"
     files = getAllXML(dir)
@@ -240,18 +262,18 @@ def abnormsRead(abnorms: dict, debug=False):
             abnorms[abnormsId]['time'] = abnorm.get('time') if abnorm.get('time') else '1'
             abnorms[abnormsId]['mobSize'] = abnorm.get('mobSize') if abnorm.get('mobSize') else ''
             abnorms[abnormsId]['priority'] = abnorm.get('priority') if abnorm.get('priority') else '1'
-            abnorms[abnormsId]['infinity'] = '1' if abnorm.get('infinity') == "True" else '0'
-            abnorms[abnormsId]['realtime'] = '1' if abnorm.get('realTime') == "True" else '0'
-            abnorms[abnormsId]['isBuff'] = '1' if abnorm.get('isBuff') == "True" else '0'
-            abnorms[abnormsId]['isShow'] = '1' if abnorm.get('isShow') == "True" else '0'
-            abnorms[abnormsId]['isStance'] = '1' if abnorm.get('isStance') == "True" else '0'
+            abnorms[abnormsId]['infinity'] = '1' if abnorm.get('infinity') == "True" or abnorm.get('infinity') == "true" else '0'
+            abnorms[abnormsId]['realtime'] = '1' if abnorm.get('realTime') == "True" or abnorm.get('realTime') == "true" else '0'
+            abnorms[abnormsId]['isBuff'] = '1' if abnorm.get('isBuff') == "True" or abnorm.get('isBuff') == "true" else '0'
+            abnorms[abnormsId]['isShow'] = '1' if abnorm.get('isShow') == "True" or abnorm.get('isShow') == "true" else '0'
+            abnorms[abnormsId]['isStance'] = '1' if abnorm.get('isStance') == "True" or abnorm.get('isStance') == "true" else '0'
             abnorms[abnormsId]['group'] = abnorm.get('group') if abnorm.get('group') else ''
 
     print(f"Reading Abnormalities complete: {abnormsNo}")
-    return abnorms
+    return sortDictionary(abnorms, debug)
 
 
-def abnormsAddString(abnorms: dict, debug=False) -> dict:
+def abnormsAddString(abnorms: dict, debug: bool=False) -> dict:
     print(f"Adding Abnormality Strings...")
     dir = "StrSheet_Abnormality"
     files = getAllXML(dir)
@@ -276,7 +298,7 @@ def abnormsAddString(abnorms: dict, debug=False) -> dict:
     return abnorms
 
 
-def abnormsAddIcon(abnorms: dict, debug=False) -> dict:
+def abnormsAddIcon(abnorms: dict, debug: bool=False) -> dict:
     print(f"Adding Abnormality Icons...")
     dir = "AbnormalityIcon"
     files = getAllXML(dir)
@@ -324,7 +346,7 @@ def abnormsInsertDb(abnorms: dict, link, conn) -> bool:
         tooltip = data['tooltip'].replace('"', "'")
         icon = data['icon'].replace('.', '/')
 
-        query = f'INSERT INTO data_abnorms (id, name, tooltip, icon, type, mobSize, kind, level, property, category, skillCategory, time, priority, infinity, realtime, isBuff, isShow, isStance) ' \
+        query = f'INSERT INTO abnorms (id, name, tooltip, icon, type, mobSize, kind, level, property, category, skillCategory, time, priority, infinity, realtime, isBuff, isShow, isStance) ' \
                 f'VALUES ("{id}", "{name}", "{tooltip}", "{icon}", "{group}", "{mobSize}", "{kind}", "{level}", "{property}", "{category}", "{skillCategory}", "{time}", "{priority}", "{infinity}", "{realtime}", "{isBuff}", "{isShow}", "{isStance}")'
         try:
             link.execute(query)
@@ -336,6 +358,158 @@ def abnormsInsertDb(abnorms: dict, link, conn) -> bool:
             print("Error while writing into Database!")
 
     if save: print(f"Inserting Abnormalities complete: {abnormNo}")
+    return save
+
+
+def skillsRead(skills: dict, debug: bool=False) -> dict:
+    print(f"Reading User Skills...")
+    dir = "UserSkill"
+    files = getAllXML(dir)
+    skillsNo = 0
+    for file in files:
+        sub = {}
+        treeSkill, rootSkill = loadXML(path=f'./data/{dir}/{file}', debug=debug)
+        for skill in rootSkill.findall('Skill'):
+            skillsNo = skillsNo + 1
+            skillsId = str(skill.get('id'))
+            skillsClassId = str(int(skill.get('templateId').replace('110', '')) - 1)
+            # append to sub dict
+            sub[skillsId] = {}
+            sub[skillsId]['id'] = skillsId
+            sub[skillsId]['class'] = skillsClassId
+            sub[skillsId]['type'] = skill.get('type') if skill.get('type') else 'n/a'
+            sub[skillsId]['category'] = skill.get('category').split(',')[0] if skill.get('category') else '0'
+            sub[skillsId]['parentId'] = skill.get('parentId') if skill.get('parentId') else '0'
+            sub[skillsId]['nextSkill'] = skill.get('nextSkill') if skill.get('nextSkill') else '0'
+            sub[skillsId]['connectNextSkill'] = skill.get('connectNextSkill') if skill.get('connectNextSkill') else '0'
+            sub[skillsId]['totalAtk'] = skill.get('totalAtk') if skill.get('totalAtk') else '0'
+            sub[skillsId]['pvpAtkRate'] = skill.get('pvpAtkRate') if skill.get('pvpAtkRate') else '0'
+            sub[skillsId]['abnormality'] = skill.get('abnormalityOnShot') if skill.get('abnormalityOnShot') else '0'
+            # append to dict
+            skills[skillsClassId] = {}
+            skills[skillsClassId] = sortDictionary(sub, debug)
+
+    print(f"Reading User Skills complete: {skillsNo}")
+    return sortDictionary(skills, debug)
+
+
+def skillsAddData(skills: dict, debug: bool=False) -> dict:
+    print(f"Adding User Skill Data...")
+    dir = "StrSheet_UserSkill"
+    files = getAllXML(dir)
+    skillsNo = 0
+    infoData = {}
+
+    for file in files:
+        treeSkill, rootSkill = loadXML(path=f'./data/{dir}/{file}', debug=debug)
+        for skill in rootSkill.findall('String'):
+            skillsId = str(skill.get('id'))
+            skillsClassId = str(getClassId(skill.get('class')))
+
+            # append to dict
+            if skillsClassId in skills:
+                if skillsId in skills[skillsClassId]:
+                    skillsNo = skillsNo + 1
+                    skills[skillsClassId][skillsId]['name'] = skill.get('name') if skill.get('name') else ''
+                    skills[skillsClassId][skillsId]['tooltip'] = skill.get('tooltip') if skill.get('tooltip') else ''
+                    skills[skillsClassId][skillsId]['race'] = str(getRaceId(skill.get('race')))
+                    skills[skillsClassId][skillsId]['gender'] = str(getGenderId(skill.get('gender')))
+
+                    infoKey = f"{skillsClassId}-{skills[skillsClassId][skillsId]['category']}"
+                    infoData[f"{infoKey}-name"] = skill.get('name') if skill.get('name') else ''
+                    infoData[f"{infoKey}-tooltip"] = skill.get('tooltip') if skill.get('tooltip') else ''
+                    infoData[f"{infoKey}-race"] = str(getRaceId(skill.get('race')))
+                    infoData[f"{infoKey}-gender"] = str(getGenderId(skill.get('gender')))
+
+
+    for classKey, classVal in skills.items():
+        for skillKey, skillVal in classVal.items():
+            if 'name' not in skillVal:
+                infoKey = f"{skillVal['class']}-{skillVal['category']}"
+                if f"{infoKey}-name" in infoData:
+                    skillsNo = skillsNo + 1
+                    skillVal['name'] = infoData[f"{infoKey}-name"]
+                    skillVal['tooltip'] = infoData[f"{infoKey}-tooltip"]
+                    skillVal['race'] = infoData[f"{infoKey}-race"]
+                    skillVal['gender'] = infoData[f"{infoKey}-gender"]
+                else:
+                    skillVal['name'] = ""
+                    skillVal['tooltip'] = ""
+                    skillVal['race'] = ""
+                    skillVal['gender'] = ""
+
+    print(f"Adding User Skill Data complete: {skillsNo}")
+    return skills
+
+
+def skillsAddIcon(skills: dict, debug: bool=False) -> dict:
+    print(f"Adding User Skill Icons...")
+    dir = "UserSkillIcon"
+    files = getAllXML(dir)
+    skillsNo = 0
+    iconData = {}
+
+    for file in files:
+        treeSkill, rootSkill = loadXML(path=f'./data/{dir}/{file}', debug=debug)
+        for skill in rootSkill.findall('Icon'):
+            skillsId = str(skill.get('skillId'))
+            skillsClassId = str(getClassId(skill.get('class')))
+            # append to dict
+            if skillsClassId in skills:
+                if skillsId in skills[skillsClassId]:
+                    skillsNo = skillsNo + 1
+                    skills[skillsClassId][skillsId]['icon'] = skill.get('iconName') if skill.get('iconName') else ''
+                    iconData[f"{skillsClassId}-{skills[skillsClassId][skillsId]['category']}"] = skill.get('iconName')
+
+    for classKey, classVal in skills.items():
+        for skillKey, skillVal in classVal.items():
+            if 'icon' not in skillVal:
+                iconKey = f"{skillVal['class']}-{skillVal['category']}"
+                if iconKey in iconData:
+                    skillsNo = skillsNo + 1
+                    skillVal['icon'] = iconData[iconKey]
+                else:
+                    skillVal['icon'] = ""
+
+    print(f"Adding User Skill Icons complete: {skillsNo}")
+    return skills
+
+
+def skillsInsertDb(skills: dict, link, conn) -> bool:
+    print(f"Inserting User Skills...")
+    save = True
+    skillsNo = 0
+    for classId, classSkills in skills.items():
+        for skillId, skillData in classSkills.items():
+
+            skillId = skillData['id']
+            name = skillData['name']
+            tooltip = skillData['tooltip']
+            icon = skillData['icon'].replace('.', '/')
+            charClass = skillData['class']
+            charRace = skillData['race']
+            charGender = skillData['gender']
+            type = skillData['type']
+            category = skillData['category']
+            parentId = skillData['parentId']
+            nextSkill = skillData['nextSkill']
+            connectNextSkill = skillData['connectNextSkill']
+            totalAtk = skillData['totalAtk']
+            pvpAtkRate = skillData['pvpAtkRate']
+            abnormality = skillData['abnormality']
+
+            query = f'INSERT INTO skills (skillId, name, tooltip, icon, charClass, charRace, charGender, type, category, parentId, nextSkill, connectNextSkill, totalAtk, pvpAtkRate, abnormality) ' \
+                    f'VALUES ("{skillId}", "{name}", "{tooltip}", "{icon}", "{charClass}", "{charRace}", "{charGender}", "{type}", "{category}", "{parentId}", "{nextSkill}", "{connectNextSkill}", "{totalAtk}", "{pvpAtkRate}", "{abnormality}")'
+            try:
+                link.execute(query)
+                conn.commit()
+                skillsNo = skillsNo + 1
+            except:
+                save = False
+                conn.rollback()
+                print("Error while writing into Database!")
+
+    if save: print(f"Inserting User Skills complete: {skillsNo}")
     return save
 
 
@@ -353,6 +527,8 @@ def getGenderId(name: str) -> int:
             return 0
         case "female":
             return 1
+        case "common":
+            return 9
 
 
 def getRaceId(name: str) -> int:
@@ -369,6 +545,8 @@ def getRaceId(name: str) -> int:
             return 4
         case "baraka":
             return 5
+        case "common":
+            return 9
 
 
 def getClassId(name: str) -> int:
@@ -399,6 +577,8 @@ def getClassId(name: str) -> int:
             return 11
         case "glaiver":  # valkyrie
             return 12
+        case "common":  # all
+            return 99
 
 # itemSearch = item.get('searchable')
 # itemCombatType = item.get('combatItemType')
