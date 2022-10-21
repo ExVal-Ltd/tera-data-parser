@@ -1,7 +1,7 @@
 # Tera Data Parser | ..a project by VALKYTEQ
 
 
-Tera Datacenter Parser to create Database Tables  
+Valkore module to parse Tera data to create a database  
 Project: **_tera-data-parser_**
 
 ### Contact:

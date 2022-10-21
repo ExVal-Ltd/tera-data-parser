@@ -1,138 +1,102 @@
-import configparser
 import datetime
 import json
-import urllib.error
 import xml.etree.ElementTree as xml
 from os.path import exists, isdir
 from os import makedirs, listdir
 from shutil import copyfile
 import codecs
-import pymysql
 
 
-def dbConnect(config: dict, debug: bool=False):
-    host = config['Parser']['db_host']
-    user = config['Parser']['db_user']
-    password = config['Parser']['db_pass']
-    database = config['Parser']['db_base']
-    charset = 'utf8mb4'
-    cursorclass = pymysql.cursors.DictCursor
-
-    conn = pymysql.connect(
-        host=host,
-        user=user,
-        password=password,
-        database=database,
-        charset=charset,
-        cursorclass=cursorclass
-    )
-
-    link = conn.cursor()
-    link.execute("SELECT VERSION()")
-    data = link.fetchone()
-    if debug: print (f"Database version: {data['VERSION()']}")
-    return link, conn
-
-
-def readConfig(ini: str) -> dict:
-    """ Read config, check for errors and store values
-
-    :param ini: Path to config_wa_gw.ini
-    :return: Config as dict
-    """
-    # Read config
-    config = configparser.ConfigParser()
-    config.read(ini)
-    # Check debug mode
-    if config['Parser']['debug'] == "True":
-        print("Debug Mode Enabled")
-    return config
-
-
-# noinspection PyArgumentList
-def loadXML(path: str, comments=False, useBackup=False, debug: bool=False):
-    if not exists(path): raise Exception(f'Path {path} doesn\'t exist!')
-    if useBackup: backup(path, debug)
-    parser = xml.XMLParser(target=xml.TreeBuilder(insert_comments=comments))
-    tree = xml.parse(path,parser)
-    root = tree.getroot()
-    if debug: print(f'Loaded {path}')
-    return tree, root
-
-
-def saveXML(path: str, tree: xml.ElementTree, debug: bool=False):
-    xml.indent(tree, space='\t')
-    tree.write(path, encoding='utf-8-sig',xml_declaration=True)
-    string = xml.tostring(tree.getroot(),'unicode').replace('\n','\r\n')
-    string = f"<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n{string}"
-    with codecs.open(path,'w','utf-8-sig') as file:
-        file.write(string)
-    if debug: print(f'Saved {path}')
-
-
-def saveTxt(path: str, string: str, debug: bool=False) -> bool:
-    with open(path,'w') as file:
-        file.write(string)
-    if debug: print(f'Saved {path}')
-    return True
-
-
-def saveJson(path: str, dict: dict, sort: bool=False, debug: bool=False) -> bool:
-    with open(path,'w') as file:
-        if sort:
-            json.dump(dict, file, sort_keys=True, indent=4)
+class Tools:
+    def __init__(self, logger: any, base, debug: bool=False):
+        self.log = logger
+        self.debug = debug
+        self.base = base
+    
+    # noinspection PyArgumentList
+    def loadXML(self, path: str, comments=False, useBackup=False):
+        if not exists(path): raise Exception(f'Path {path} doesn\'t exist!')
+        if useBackup: self.backup(path)
+        parser = xml.XMLParser(target=xml.TreeBuilder(insert_comments=comments))
+        tree = xml.parse(path,parser)
+        root = tree.getroot()
+        if self.debug: self.log.info(f'Loaded {path}')
+        return tree, root
+    
+    
+    def saveXML(self, path: str, tree: xml.ElementTree):
+        xml.indent(tree, space='\t')
+        tree.write(path, encoding='utf-8-sig',xml_declaration=True)
+        string = xml.tostring(tree.getroot(),'unicode').replace('\n','\r\n')
+        string = f"<?xml version=\"1.0\" encoding=\"utf-8\"?>\r\n{string}"
+        with codecs.open(path,'w','utf-8-sig') as file:
+            file.write(string)
+        if self.debug: self.log.info(f'Saved {path}')
+    
+    
+    def saveTxt(self, path: str, string: str) -> bool:
+        with open(path,'w') as file:
+            file.write(string)
+        if self.debug: self.log.info(f'Saved {path}')
+        return True
+    
+    
+    def saveJson(self, path: str, dict: dict, sort: bool=False) -> bool:
+        with open(path,'w') as file:
+            if sort:
+                json.dump(dict, file, sort_keys=True, indent=4)
+            else:
+                json.dump(dict, file, indent=4)
+        if self.debug: self.log.info(f'Saved {path}')
+        return True
+    
+    
+    def backup(self, path) -> str:
+        bak = path+'.bak'
+        if not exists(bak):
+            copyfile(path, bak)
+            if self.debug: self.log.info(f'Created {bak}')
         else:
-            json.dump(dict, file, indent=4)
-    if debug: print(f'Saved {path}')
-    return True
-
-
-def backup(path, debug: bool=False) -> str:
-    bak = path+'.bak'
-    if not exists(bak):
-        copyfile(path, bak)
-        if debug: print(f'Created {bak}')
-    else:
-        print(f"{bak} already exists!")
-    return bak
-
-
-def getAllXML(path: str) -> list:
-    files = []
-    for file in listdir(f"./data/{path}"):
-        if file.endswith(".xml"):
-            files.append(file)
-    return files
-
-
-def sortIterable(list: set, debug: bool=False) -> list:
-    if debug: print(f"Sorting Entities...")
-    listSorted = sorted(list)
-    listNo = len(listSorted)
-    if debug: print(f"Sorting Entities complete: {listNo}")
-    return listSorted
-
-
-def sortDictionary(dict: dict, debug: bool=False) -> dict:
-    if debug: print(f"Sorting Entities...")
-    dictSorted = {k: dict[k] for k in sorted(dict)}
-    dictNo = len(dictSorted)
-    if debug: print(f"Sorting Entities complete: {dictNo}")
-    return dictSorted
-
-
-def getAttributes(typ: str, debug: bool=False) -> set:
-    print(f"Getting Attributes...")
-    files = getAllXML(typ)
-    attributes = set()
-    for file in files:
-        treeItem, rootItem = loadXML(path=f'./data/{typ}/{file}', debug=debug)
-        for item in rootItem.findall('Item'):
-            attributes.update(item.attrib.keys())
-    # print(attributes)
-    attributesNo = len(attributes)
-    print(f"Getting Attributes complete: {attributesNo}")
-    return attributes
+            self.log.info(f"{bak} already exists!")
+        return bak
+    
+    
+    def getAllXML(self, path: str) -> list:
+        files = []
+        for file in listdir(f"{self.base}/data/{path}"):
+            if file.endswith(".xml"):
+                files.append(file)
+        return files
+    
+    
+    def sortIterable(self, list: set) -> list:
+        if self.debug: self.log.info(f"Sorting Entities...")
+        listSorted = sorted(list)
+        listNo = len(listSorted)
+        if self.debug: self.log.info(f"Sorting Entities complete: {listNo}")
+        return listSorted
+    
+    
+    def sortDictionary(self, dict: dict) -> dict:
+        if self.debug: self.log.info(f"Sorting Entities...")
+        dictSorted = {k: dict[k] for k in sorted(dict)}
+        dictNo = len(dictSorted)
+        if self.debug: self.log.info(f"Sorting Entities complete: {dictNo}")
+        return dictSorted
+    
+    
+    def getAttributes(self, typ: str) -> set:
+        self.log.info(f"Getting Attributes...")
+        files = self.getAllXML(typ)
+        attributes = set()
+        for file in files:
+            treeItem, rootItem = self.loadXML(path=f'{self.base}/data/{typ}/{file}')
+            for item in rootItem.findall('Item'):
+                attributes.update(item.attrib.keys())
+        # self.log.info(attributes)
+        attributesNo = len(attributes)
+        self.log.info(f"Getting Attributes complete: {attributesNo}")
+        return attributes
 
 
 def performance(stage: str, time=False) -> datetime:
