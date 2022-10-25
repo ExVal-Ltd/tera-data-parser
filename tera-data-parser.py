@@ -136,11 +136,10 @@ def run(logger: any):
 	global BASE
 	if logger is None:
 		BASE = "."
-		LOGGER = Logger(name=NAME)
 	else:
 		BASE = f"./modules/{NAME}"
-		LOGGER = logger
 
+	LOGGER = Logger(name=NAME)
 	CONFIG = Config(path=f"{BASE}/config.ini").readConfig()
 	LOGGER.info(f"Starting {CONFIG['VKore']['name']}")
 
